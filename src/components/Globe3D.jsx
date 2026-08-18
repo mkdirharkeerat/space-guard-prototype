@@ -135,8 +135,13 @@ export default function Globe3D({
     const { width, height } = getContainerSize();
 
     // 1. Scene setup
+    // --- 🌌 Cinematic Starfield Background ---
+    const textureLoader = new THREE.TextureLoader();
+    const starTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/night-sky.png');
+    
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x040711);
+    // Use the starmap as the scene background
+    scene.background = starTexture;
     sceneRef.current = scene;
 
     // 2. Camera setup
@@ -146,39 +151,28 @@ export default function Globe3D({
     cameraRef.current = camera;
 
     // 3. Renderer setup with safe WebGL fallback
-    let renderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ 
-        antialias: true, 
-        alpha: false,
-        powerPreference: 'high-performance',
-        failIfMajorPerformanceCaveat: false 
-      });
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.3;
-      
-      while (containerRef.current.firstChild) {
-        containerRef.current.removeChild(containerRef.current.firstChild);
-      }
-      containerRef.current.appendChild(renderer.domElement);
-      rendererRef.current = renderer;
-    } catch (err) {
-      console.warn('WebGL Renderer not available, enabling 2D telemetry mode:', err);
-      return;
-    }
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Tone mapping for realistic bright sun / dark space
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    containerRef.current.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
 
-    // 4. Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    // 4. Cinematic Space Lighting
+    // Very low ambient light so the "dark side" of Earth is actually dark
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.02);
     scene.add(ambientLight);
-
-    const sunLight = new THREE.DirectionalLight(0xffffff, 2.2);
-    sunLight.position.set(20, 15, 20);
+    
+    // Strong directional "Sun"
+    const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
+    sunLight.position.set(25, 10, 15);
     scene.add(sunLight);
-
-    const rimLight = new THREE.DirectionalLight(0x06b6d4, 1.2);
-    rimLight.position.set(-20, -10, -20);
+    
+    // Subtle blue rim light from the opposite side to highlight the edge
+    const rimLight = new THREE.DirectionalLight(0x3b82f6, 0.8);
+    rimLight.position.set(-25, -10, -25);
     scene.add(rimLight);
 
     // 5. Earth Group
@@ -244,6 +238,7 @@ export default function Globe3D({
     const earthDiffuse = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
     const earthBump = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png');
     const earthSpecular = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-water.png');
+    const earthNight = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
     
     // Create the Earth Mesh
     const earthGeom = new THREE.SphereGeometry(earthRadius, 64, 64);
@@ -254,6 +249,9 @@ export default function Globe3D({
       specularMap: earthSpecular,
       specular: new THREE.Color('grey'),
       shininess: 35,
+      emissiveMap: earthNight,
+      emissive: new THREE.Color(0xffffff),
+      emissiveIntensity: 0.5, // Reduced intensity so cities don't look radioactive
     });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthParent.add(earthMesh);
@@ -389,10 +387,9 @@ export default function Globe3D({
       if (satellitesGroup) {
         satellitesGroup.children.forEach(sat => {
           if (currentMode === 'live') {
-            if (sat.userData?.orbitRadius) {
+            if (sat.userData?.speed) {
               const angle = time * sat.userData.speed + sat.userData.initialAngle;
-              const r = sat.userData.orbitRadius;
-              sat.position.set(r * Math.cos(angle), 0, r * Math.sin(angle));
+              // sat is the pivotGroup
               sat.rotation.y = -angle;
             }
           } else {
@@ -453,12 +450,26 @@ export default function Globe3D({
         }
       }
 
-      // Pulsate encounter nodes
+      // Pulsate encounter nodes & Animate Shockwave
       if (conjunctionGroup) {
         conjunctionGroup.children.forEach(child => {
           if (child.userData?.isBeacon) {
             const scale = 1 + 0.3 * Math.sin(time * 5);
             child.scale.set(scale, scale, scale);
+          }
+          if (child.userData?.isShockwave) {
+            if (currentMode === 'collision_2009' && p >= tcaFraction) {
+              child.visible = true;
+              // Expand rapidly
+              const expansion = (p - tcaFraction) * 50; 
+              child.scale.set(1 + expansion, 1 + expansion, 1 + expansion);
+              // Fade out
+              child.material.opacity = Math.max(0, 1 - (p - tcaFraction) * 4);
+            } else {
+              child.visible = false;
+              child.scale.set(1, 1, 1);
+              child.material.opacity = 1;
+            }
           }
         });
       }
@@ -598,29 +609,58 @@ export default function Globe3D({
 
       // Background Catalog Satellites
       if (objects.length > 0) {
-        const satPositions = [];
-        objects.forEach(obj => {
+        objects.forEach((obj, idx) => {
           if (obj.position_km && obj.position_km.length === 3) {
             const [x, y, z] = obj.position_km;
-            satPositions.push(x * scaleFactor, z * scaleFactor, -y * scaleFactor);
+            const dist = Math.sqrt(x*x + y*y + z*z);
+            const r = dist * scaleFactor;
+            
+            // Infer some orbital parameters just for visual wow-factor animation
+            const inclination = Math.acos(z / dist); // rad
+            const raan = Math.atan2(y, x); // rad
+            const speed = 0.5 + (idx % 5) * 0.1;
+            const initialAngle = raan;
+
+            // Orbit Ring (Trail)
+            const orbit = createOrbitRing(dist - earthRadius, inclination * (180/Math.PI), raan * (180/Math.PI), 0x06b6d4);
+            orbit.material.opacity = 0.15;
+            orbitsGroupRef.current.add(orbit);
+
+            // Orbit Pivot (rotates the satellite around Earth)
+            const pivotGroup = new THREE.Group();
+            // Apply inclination tilt so it rotates in its own plane
+            pivotGroup.rotation.z = inclination;
+            pivotGroup.rotation.y = raan;
+
+            // Satellite Model (offset by orbit radius)
+            const satGroup = new THREE.Group();
+            satGroup.position.set(r, 0, 0); // Offset it to the orbit ring
+
+            const satModel = createSatelliteModel(0xffffff, 0x0ea5e9);
+            satModel.scale.set(0.4, 0.4, 0.4);
+            satGroup.add(satModel);
+            
+            // Add a glowing corona to the satellite
+            const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+              map: createGlowSpriteTexture('#0ea5e9'),
+              color: 0x0ea5e9,
+              transparent: true,
+              opacity: 0.8,
+              blending: THREE.AdditiveBlending
+            }));
+            glowSprite.scale.set(1.5, 1.5, 1.5);
+            satGroup.add(glowSprite);
+
+            pivotGroup.add(satGroup);
+
+            pivotGroup.userData = {
+              speed: speed,
+              initialAngle: initialAngle
+            };
+            
+            satellitesGroupRef.current.add(pivotGroup);
           }
         });
-
-        if (satPositions.length > 0) {
-          const satGeom = new THREE.BufferGeometry();
-          satGeom.setAttribute('position', new THREE.Float32BufferAttribute(satPositions, 3));
-          const glowTexture = createGlowSpriteTexture('#06B6D4');
-          const satMat = new THREE.PointsMaterial({
-            size: 1.6,
-            map: glowTexture,
-            transparent: true,
-            opacity: 0.9,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-          });
-          const satPoints = new THREE.Points(satGeom, satMat);
-          satellitesGroupRef.current.add(satPoints);
-        }
       }
     } else {
       // 2009 Collision or Avoidance Mode
@@ -670,6 +710,20 @@ export default function Globe3D({
       encounterNode.position.set(encX, encY, encZ);
       encounterNode.userData = { isBeacon: true };
       conjunctionGroupRef.current.add(encounterNode);
+
+      // Collision Shockwave Ring
+      if (simMode === 'collision_2009') {
+        const shockwave = new THREE.Mesh(
+          new THREE.TorusGeometry(0.5, 0.05, 16, 64),
+          new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 1, side: THREE.DoubleSide })
+        );
+        shockwave.position.set(encX, encY, encZ);
+        // orient it roughly perpendicular to the collision
+        shockwave.lookAt(0, encY, encZ);
+        shockwave.userData = { isShockwave: true };
+        shockwave.visible = false;
+        conjunctionGroupRef.current.add(shockwave);
+      }
 
       // 4. Generate 200 Debris Fragments for Collision Shockwave
       if (simMode === 'collision_2009') {
