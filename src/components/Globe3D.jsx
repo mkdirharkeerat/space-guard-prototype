@@ -176,12 +176,14 @@ export default function Globe3D({
     // 1. Scene setup
     // --- 🌌 Cinematic Starfield Background ---
     const textureLoader = new THREE.TextureLoader();
-    const starTexture = textureLoader.load('/textures/night-sky.png');
-    
+
     const scene = new THREE.Scene();
-    // Use the starmap as the scene background
-    scene.background = starTexture;
     sceneRef.current = scene;
+
+    // Load starfield background — set it only once the texture is ready
+    textureLoader.load('/textures/night-sky.png', (starTexture) => {
+      scene.background = starTexture;
+    });
 
     // 2. Camera setup
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
@@ -193,26 +195,14 @@ export default function Globe3D({
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    // Tone mapping for realistic bright sun / dark space
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    // Flat tone mapping — pure texture colours, no colour shifting
+    renderer.toneMapping = THREE.NoToneMapping;
     containerRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    // 4. Cinematic Space Lighting
-    // Very low ambient light so the "dark side" of Earth is actually dark
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.02);
+    // 4. Full ambient light so the Earth texture is always visible
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
     scene.add(ambientLight);
-    
-    // Strong directional "Sun"
-    const sunLight = new THREE.DirectionalLight(0xffffff, 3.5);
-    sunLight.position.set(25, 10, 15);
-    scene.add(sunLight);
-    
-    // Subtle blue rim light from the opposite side to highlight the edge
-    const rimLight = new THREE.DirectionalLight(0x3b82f6, 0.8);
-    rimLight.position.set(-25, -10, -25);
-    scene.add(rimLight);
 
     // 5. Earth Group
     const earthParent = new THREE.Group();
@@ -261,33 +251,20 @@ export default function Globe3D({
     
     // Use reliable high-res textures loaded from local public folder
     const earthDiffuse = textureLoader.load('/textures/earth-blue-marble.jpg');
-    const earthBump = textureLoader.load('/textures/earth-topology.png');
-    const earthSpecular = textureLoader.load('/textures/earth-water.png');
-    const earthNight = textureLoader.load('/textures/earth-night.jpg');
-    
-    // Create the Earth Mesh
+
+    // MeshBasicMaterial — renders texture directly without needing any lights
     const earthGeom = new THREE.SphereGeometry(earthRadius, 64, 64);
-    const earthMat = new THREE.MeshPhongMaterial({
-      map: earthDiffuse,
-      bumpMap: earthBump,
-      bumpScale: 0.1,
-      specularMap: earthSpecular,
-      specular: new THREE.Color('grey'),
-      shininess: 35,
-      emissiveMap: earthNight,
-      emissive: new THREE.Color(0xffffff),
-      emissiveIntensity: 0.5, // Reduced intensity so cities don't look radioactive
-    });
+    const earthMat = new THREE.MeshBasicMaterial({ map: earthDiffuse });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthParent.add(earthMesh);
 
     // --- ☁️ Cloud Layer ---
     const cloudTexture = textureLoader.load('/textures/earth-clouds.png');
     const cloudGeom = new THREE.SphereGeometry(earthRadius * 1.008, 64, 64);
-    const cloudMat = new THREE.MeshPhongMaterial({
+    const cloudMat = new THREE.MeshBasicMaterial({
       map: cloudTexture,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.5,
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       depthWrite: false,
