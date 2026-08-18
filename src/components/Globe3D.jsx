@@ -611,17 +611,18 @@ export default function Globe3D({
         objects.forEach((obj, idx) => {
           if (obj.position_km && obj.position_km.length === 3) {
             const [x, y, z] = obj.position_km;
-            const dist = Math.sqrt(x*x + y*y + z*z);
+            const dist = Math.sqrt(x*x + y*y + z*z) || 7000; // prevent divide by zero
             const r = dist * scaleFactor;
             
             // Infer some orbital parameters just for visual wow-factor animation
-            const inclination = Math.acos(z / dist); // rad
-            const raan = Math.atan2(y, x); // rad
+            // Clamp to [-1, 1] to prevent NaN from float precision errors
+            const inclination = Math.acos(Math.max(-1, Math.min(1, z / dist))); 
+            const raan = Math.atan2(y, x) || 0; 
             const speed = 0.5 + (idx % 5) * 0.1;
             const initialAngle = raan;
 
             // Orbit Ring (Trail)
-            const orbit = createOrbitRing(dist - earthRadius, inclination * (180/Math.PI), raan * (180/Math.PI), 0x06b6d4);
+            const orbit = createOrbitRing(dist, inclination * (180/Math.PI), raan * (180/Math.PI), 0x06b6d4);
             orbit.material.opacity = 0.15;
             orbitsGroupRef.current.add(orbit);
 
