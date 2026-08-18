@@ -137,7 +137,7 @@ export default function Globe3D({
     // 1. Scene setup
     // --- 🌌 Cinematic Starfield Background ---
     const textureLoader = new THREE.TextureLoader();
-    const starTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/night-sky.png');
+    const starTexture = textureLoader.load('/textures/night-sky.png');
     
     const scene = new THREE.Scene();
     // Use the starmap as the scene background
@@ -177,67 +177,54 @@ export default function Globe3D({
 
     // 5. Earth Group
     const earthParent = new THREE.Group();
+    earthParent.rotation.x = targetRotationRef.current.x;
+    earthParent.rotation.y = targetRotationRef.current.y;
     scene.add(earthParent);
     earthGroupRef.current = earthParent;
 
     const earthRadius = 6.378;
 
-    // 5a. Procedural Vector Earth Texture
+    // Fake Continents Canvas (Fallback logic)
     const canvas = document.createElement('canvas');
     canvas.width = 2048;
     canvas.height = 1024;
     const ctx = canvas.getContext('2d');
 
-    // Deep ocean base
-    ctx.fillStyle = '#081122';
+    // Base Earth background
+    ctx.fillStyle = '#0f172a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Coordinate graticules
-    ctx.strokeStyle = 'rgba(6, 182, 212, 0.15)';
-    ctx.lineWidth = 1.5;
-    for (let x = 0; x <= canvas.width; x += 128) {
+    // Simple pseudo-continents using noise/dots
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    
+    // Instead of random, draw a few static blobs
+    const drawBlob = (cx, cy, r) => {
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, canvas.height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= canvas.height; y += 128) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-
-    // Smooth Continents Drawing
-    ctx.fillStyle = '#10B981';
-    ctx.strokeStyle = '#059669';
-    ctx.lineWidth = 2;
-
-    const landmasses = [
-      [[350, 180], [600, 160], [700, 260], [650, 420], [550, 480], [450, 450], [380, 320]],
-      [[580, 500], [720, 540], [780, 680], [700, 850], [620, 850], [560, 680]],
-      [[1050, 180], [1280, 160], [1320, 320], [1150, 380], [1020, 340]],
-      [[1280, 160], [1750, 180], [1820, 380], [1650, 500], [1400, 480], [1320, 320]],
-      [[1020, 400], [1280, 400], [1340, 600], [1250, 820], [1100, 820], [980, 550]],
-      [[1550, 620], [1780, 620], [1820, 780], [1600, 820], [1520, 720]],
-    ];
-    landmasses.forEach(p => {
-      ctx.beginPath();
-      p.forEach((pt, i) => {
-        if (i === 0) ctx.moveTo(pt[0], pt[1]);
-        else ctx.lineTo(pt[0], pt[1]);
-      });
-      ctx.closePath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+    };
+    [ [500, 300, 120], [1400, 350, 150], [1200, 600, 180] ].forEach(([x, y, r]) => {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 2;
+      drawBlob(x, y, r);
+      drawBlob(x + 50, y + 20, r * 0.8);
+      drawBlob(x - 30, y - 40, r * 0.9);
+      for(let i=0; i<20; i++) {
+        ctx.beginPath();
+        ctx.arc(x + (Math.random()-0.5)*r*1.5, y + (Math.random()-0.5)*r*1.5, Math.random()*20+5, 0, Math.PI*2);
+        ctx.fill();
+        ctx.stroke();
+      }
     });
     // --- 🌍 Photorealistic Earth Textures ---
     
-    // Use reliable high-res textures from unpkg
-    const earthDiffuse = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-    const earthBump = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png');
-    const earthSpecular = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-water.png');
-    const earthNight = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
+    // Use reliable high-res textures loaded from local public folder
+    const earthDiffuse = textureLoader.load('/textures/earth-blue-marble.jpg');
+    const earthBump = textureLoader.load('/textures/earth-topology.png');
+    const earthSpecular = textureLoader.load('/textures/earth-water.png');
+    const earthNight = textureLoader.load('/textures/earth-night.jpg');
     
     // Create the Earth Mesh
     const earthGeom = new THREE.SphereGeometry(earthRadius, 64, 64);
@@ -256,7 +243,7 @@ export default function Globe3D({
     earthParent.add(earthMesh);
 
     // --- ☁️ Cloud Layer ---
-    const cloudTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png');
+    const cloudTexture = textureLoader.load('/textures/earth-clouds.png');
     const cloudGeom = new THREE.SphereGeometry(earthRadius * 1.008, 64, 64);
     const cloudMat = new THREE.MeshPhongMaterial({
       map: cloudTexture,
