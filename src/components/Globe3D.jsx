@@ -103,6 +103,13 @@ export default function Globe3D({
   const simSpeedRef = useRef(1);
   const simModeRef = useRef(initialMode);
 
+  // Sync prop changes to state so we don't have to unmount/remount the whole WebGL canvas
+  useEffect(() => {
+    setSimMode(initialMode);
+    setSimProgress(0);
+    setIsPlaying(true);
+  }, [initialMode]);
+
   useEffect(() => {
     simModeRef.current = simMode;
     if (onModeChange) onModeChange(simMode);

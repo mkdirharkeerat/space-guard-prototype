@@ -241,17 +241,20 @@ export default function App() {
           {/* Ambient Background Gradient */}
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 via-black to-black pointer-events-none" />
           
-          {stepData.globeMode ? (
+          {/* Always render Globe3D so WebGL shaders compile and textures upload instantly on app load */}
+          <div className={`absolute inset-0 transition-opacity duration-700 ${stepData.globeMode ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
             <Globe3D 
-              initialMode={stepData.globeMode} 
+              initialMode={stepData.globeMode || 'live'} 
               objects={liveObjects} 
-              key={stepData.globeMode} 
             />
-          ) : (
-            <div className="flex flex-col items-center justify-center text-center max-w-md mx-auto z-10">
+          </div>
+
+          {/* Loading Spinner Overlay for Step 0 */}
+          {!stepData.globeMode && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center z-10 bg-black/80 backdrop-blur-sm">
               <div className="w-24 h-24 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-8" />
               <h3 className="text-2xl font-bold mb-2">Establishing Uplink</h3>
-              <p className="text-gray-400">Connecting to CelesTrak public database to stream real-time orbital elements...</p>
+              <p className="text-gray-400 max-w-md">Connecting to CelesTrak public database to stream real-time orbital elements...</p>
             </div>
           )}
         </div>
