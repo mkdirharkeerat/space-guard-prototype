@@ -1,16 +1,27 @@
-# React + Vite
+# Space-Guard (SIH 2026)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+**Space-Guard** is an advanced orbital collision detection and avoidance planning system.
 
-Currently, two official plugins are available:
+> **Note:** This repository contains the **Frontend Visualization Prototype** built for the Smart India Hackathon (SIH) 2026 presentation.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Overview
+This interactive WebGL walkthrough demonstrates the core capabilities of the Space-Guard platform:
+1. **Live Telemetry Parsing**: Ingesting TLE data from CelesTrak.
+2. **SGP4 Propagation**: Real-time orbital mechanics mapped in 3D.
+3. **Collision Detection**: Historical replay of the 2009 Iridium-Cosmos collision.
+4. **Maneuver Planning**: Real-time interactive calculation of Clohessy-Wiltshire (CW) avoidance burns.
 
-## React Compiler
+## Tech Stack
+- React 19 + Vite
+- Three.js (WebGL rendering)
+- TailwindCSS (Styling)
+- Framer Motion (Animations)
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Running Locally
+\`\`\`bash
+npm install
+npm run dev
+\`\`\`
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+## Note to Evaluators
+The physics computations, TLE propagation (sgp4), and Conjunction Data Message (CDM) generators live in our separate Python FastAPI backend repository. This React application serves as the presentation layer to visualize those capabilities interactively.

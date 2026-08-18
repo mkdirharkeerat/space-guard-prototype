@@ -83,7 +83,9 @@ export default function Globe3D({
   objects = [], 
   initialMode = 'live',
   onModeChange,
-  onLoadProgress
+  onLoadProgress,
+  simLeadTime = 24,
+  simDeltaV = 0.10
 }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -114,6 +116,9 @@ export default function Globe3D({
   const isPlayingRef = useRef(true);
   const simSpeedRef = useRef(1);
   const simModeRef = useRef(initialMode);
+  
+  const simLeadTimeRef = useRef(simLeadTime);
+  const simDeltaVRef = useRef(simDeltaV);
 
   // Sync prop changes to state so we don't have to unmount/remount the whole WebGL canvas
   useEffect(() => {
@@ -138,6 +143,14 @@ export default function Globe3D({
   useEffect(() => {
     simProgressRef.current = simProgress;
   }, [simProgress]);
+
+  useEffect(() => {
+    simLeadTimeRef.current = simLeadTime;
+  }, [simLeadTime]);
+
+  useEffect(() => {
+    simDeltaVRef.current = simDeltaV;
+  }, [simDeltaV]);
 
   // Main Three.js Setup
   useEffect(() => {
@@ -417,11 +430,17 @@ export default function Globe3D({
                 let thrustActive = false;
                 let offsetShift = 0;
                 
+                const currentLead = simLeadTimeRef.current;
+                const currentDv = simDeltaVRef.current;
+                const shiftKm = Math.abs((4 * Math.sin(0.00103 * currentLead * 3600) - 3 * 0.00103 * currentLead * 3600) / 0.00103) * (currentDv / 1000);
+                const totalMissKm = 0.003 + shiftKm;
+                const visualOffsetScale = (totalMissKm / 4.83) * 80;
+                
                 if (p > 0.15) {
                   if (p < 0.45) thrustActive = true; // Make burn duration longer so it's clearly visible
                   const shiftProgress = Math.min(1, (p - 0.15) / 0.4);
                   const ease = 1 - Math.pow(1 - shiftProgress, 3);
-                  offsetShift = ease * 0.00483 * 80;
+                  offsetShift = ease * 0.00483 * visualOffsetScale;
                 }
                 
                 const offsetR = r + offsetShift;
@@ -697,8 +716,11 @@ export default function Globe3D({
         orbitsGroupRef.current.add(orbitIridium);
         orbitsGroupRef.current.add(orbitCosmos);
       } else if (simMode === 'avoidance_2009') {
+        const shiftKm = Math.abs((4 * Math.sin(0.00103 * simLeadTime * 3600) - 3 * 0.00103 * simLeadTime * 3600) / 0.00103) * (simDeltaV / 1000);
+        // We scale the visual representation of shiftKm so it's visible on the globe (e.g. multiply by 80)
+        const visualShiftKm = (shiftKm / 4.83) * 4.83 * 80;
         const orbitOriginal = createOrbitRing(altKm, incIridium, 0, 0xef4444, true);
-        const orbitAvoidance = createOrbitRing(altKm + 4.83, incIridium, 0, 0x10b981);
+        const orbitAvoidance = createOrbitRing(altKm + visualShiftKm, incIridium, 0, 0x10b981);
         const orbitCosmos = createOrbitRing(altKm, incCosmos, 45, 0xf59e0b);
         orbitsGroupRef.current.add(orbitOriginal);
         orbitsGroupRef.current.add(orbitAvoidance);
@@ -781,7 +803,7 @@ export default function Globe3D({
         }
       }
     }
-  }, [simMode, selectedEvent, activeEvents, objects]);
+  }, [simMode, selectedEvent, activeEvents, objects, simLeadTime, simDeltaV]);
 
   const handleResetCamera = () => {
     sound.playClick();
@@ -886,8 +908,10 @@ export default function Globe3D({
         ) : (
           <div className="flex flex-col gap-0.5 text-[11px] font-mono">
             <span className="text-primary font-semibold">Iridium 33 Escape Burn</span>
-            <span className="text-foreground">ΔV = 0.10 m/s at T - 24h</span>
-            <span className="text-emerald-400 font-semibold">Clearance: +4.83 km (Safe)</span>
+            <span className="text-foreground">ΔV = {simDeltaV.toFixed(2)} m/s at T - {simLeadTime}h</span>
+            <span className="text-emerald-400 font-semibold">
+              Clearance: +{(0.003 + Math.abs((4 * Math.sin(0.00103 * simLeadTime * 3600) - 3 * 0.00103 * simLeadTime * 3600) / 0.00103) * (simDeltaV / 1000)).toFixed(2)} km (Safe)
+            </span>
           </div>
         )}
       </div>

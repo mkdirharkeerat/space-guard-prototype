@@ -3,91 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Satellite, Database, Activity, Flame, Shield, ArrowRight, RefreshCcw } from 'lucide-react';
 import Globe3D from './components/Globe3D';
 
-const STORY_STEPS = [
-  {
-    id: 0,
-    title: "1. The Raw Data",
-    subtitle: "Fetching Satellite Telemetry",
-    icon: Database,
-    content: (
-      <div className="space-y-4 text-gray-300">
-        <p>To prevent collisions, we first need to know where everything is. We connect directly to the <strong>CelesTrak</strong> public database to fetch live telemetry (TLE data) for active satellites.</p>
-        <p>Every second counts. Instead of looking at 27,000 objects blindly, our system performs an instant altitude-band filter to drop 90% of pairs that can never collide.</p>
-        <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg font-mono text-xs text-blue-300 mt-4 h-32 overflow-hidden relative">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#05050A] pointer-events-none z-10" />
-          <motion.div
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: -40, opacity: 1 }}
-            transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-            className="space-y-2"
-          >
-            <div>[OK] Fetching TLE from space-track.org...</div>
-            <div>[OK] 25,412 active objects found.</div>
-            <div>[OK] Running stage-1 coarse filter...</div>
-            <div>[OK] 24,900 pairs discarded (no altitude overlap).</div>
-            <div>[WARN] 14 pairs require precise calculation.</div>
-            <div>[OK] Preparing physics engine...</div>
-          </motion.div>
-        </div>
-      </div>
-    ),
-    globeMode: null
-  },
-  {
-    id: 1,
-    title: "2. The Physics Engine",
-    subtitle: "Mapping to Reality",
-    icon: Activity,
-    content: (
-      <div className="space-y-4 text-gray-300">
-        <p>Raw code isn't enough. We use the <strong>SGP4 Physics Engine</strong> to translate those raw data lines into precise X, Y, Z coordinates in space.</p>
-        <p>To the right, you can see a live map of actual satellites orbiting Earth right now. Our system tracks their paths, calculating exactly where they will be up to 72 hours in the future.</p>
-        <p className="text-sm text-blue-400 mt-4 border-l-2 border-blue-500 pl-3">
-          <strong>Try it:</strong> Rotate the globe to see the orbital paths and current positions.
-        </p>
-      </div>
-    ),
-    globeMode: 'live'
-  },
-  {
-    id: 2,
-    title: "3. The 2009 Disaster",
-    subtitle: "A Preventable Catastrophe",
-    icon: Flame,
-    content: (
-      <div className="space-y-4 text-gray-300">
-        <p>To prove our system works, we fed it historical data from February 10, 2009. On this day, an active US communications satellite (Iridium 33) crashed head-on into a dead Russian satellite (Cosmos 2251).</p>
-        <p>They hit at over <strong>50,000 km/h</strong>, destroying both instantly and creating over 2,000 pieces of dangerous debris.</p>
-        <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-lg mt-4">
-          <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-            </span>
-            CRITICAL ALERT
-          </div>
-          <p className="text-sm text-red-200">Our system independently detected this crash 48 hours in advance, calculating a 1-in-5,000 crash risk.</p>
-        </div>
-      </div>
-    ),
-    globeMode: 'collision_2009'
-  },
-  {
-    id: 3,
-    title: "4. The Escape Plan",
-    subtitle: "Automatic Avoidance",
-    icon: Shield,
-    content: (
-      <AvoidanceControls />
-    ),
-    globeMode: 'avoidance_2009'
-  }
-];
-
-function AvoidanceControls() {
-  const [simLeadTime, setSimLeadTime] = useState(24);
-  const [simDeltaV, setSimDeltaV] = useState(0.10);
-
+function AvoidanceControls({ simLeadTime, setSimLeadTime, simDeltaV, setSimDeltaV }) {
   // Math for step 4 clearance calculation
   const shiftKm = Math.abs((4 * Math.sin(0.00103 * simLeadTime * 3600) - 3 * 0.00103 * simLeadTime * 3600) / 0.00103) * (simDeltaV / 1000);
   const totalMissKm = 0.003 + shiftKm;
@@ -116,7 +32,7 @@ function AvoidanceControls() {
 
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span>Engine push strength (ΔV)</span>
+            <span>Burn intensity (ΔV)</span>
             <span className="font-mono text-blue-400">{simDeltaV.toFixed(2)} m/s</span>
           </div>
           <input 
@@ -146,16 +62,116 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [liveObjects, setLiveObjects] = useState([]);
   const [loadProgress, setLoadProgress] = useState(0);
+  const [isUsingFallbackData, setIsUsingFallbackData] = useState(false);
+  
+  // Interactive Simulation State
+  const [simLeadTime, setSimLeadTime] = useState(24);
+  const [simDeltaV, setSimDeltaV] = useState(0.10);
+
+  // STORY_STEPS generated inside App to access state
+  const STORY_STEPS = [
+    {
+      id: 0,
+      title: "1. The Raw Data",
+      subtitle: "Fetching Satellite Telemetry",
+      icon: Database,
+      content: (
+        <div className="space-y-4 text-gray-300">
+          <p>To prevent collisions, we first need to know where everything is. We connect directly to the <strong>CelesTrak</strong> public database to fetch live telemetry (TLE data) for active satellites.</p>
+          <p>Every second counts. Instead of looking at 27,000 objects blindly, our system performs an instant altitude-band filter to drop 90% of pairs that can never collide.</p>
+          <div className="bg-blue-900/20 border border-blue-500/30 p-4 rounded-lg font-mono text-xs text-blue-300 mt-4 h-32 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#05050A] pointer-events-none z-10" />
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: -40, opacity: 1 }}
+              transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+              className="space-y-2"
+            >
+              <div>[OK] Fetching TLE from space-track.org...</div>
+              <div>[OK] 25,412 active objects found.</div>
+              <div>[OK] Running stage-1 coarse filter...</div>
+              <div>[OK] 24,900 pairs discarded (no altitude overlap).</div>
+              <div>[WARN] 14 pairs require precise calculation.</div>
+              <div>[OK] Preparing physics engine...</div>
+            </motion.div>
+          </div>
+        </div>
+      ),
+      globeMode: null
+    },
+    {
+      id: 1,
+      title: "2. The Physics Engine",
+      subtitle: "Mapping to Reality",
+      icon: Activity,
+      content: (
+        <div className="space-y-4 text-gray-300">
+          <p>Raw code isn't enough. We use the <strong>SGP4 Physics Engine</strong> to translate those raw data lines into precise X, Y, Z coordinates in space.</p>
+          <p>To the right, you can see a live map of actual satellites orbiting Earth right now. Our system tracks their paths, calculating exactly where they will be up to 72 hours in the future.</p>
+          <p className="text-sm text-blue-400 mt-4 border-l-2 border-blue-500 pl-3">
+            <strong>Try it:</strong> Rotate the globe to see the orbital paths and current positions.
+          </p>
+        </div>
+      ),
+      globeMode: 'live'
+    },
+    {
+      id: 2,
+      title: "3. The 2009 Disaster",
+      subtitle: "A Preventable Catastrophe",
+      icon: Flame,
+      content: (
+        <div className="space-y-4 text-gray-300">
+          <p>To prove our system works, we fed it historical data from February 10, 2009. On this day, an active US communications satellite (Iridium 33) crashed head-on into a dead Russian satellite (Cosmos 2251).</p>
+          <p>They hit at over <strong>50,000 km/h</strong>, destroying both instantly and creating over 2,000 pieces of dangerous debris.</p>
+          <div className="bg-red-900/20 border border-red-500/50 p-4 rounded-lg mt-4">
+            <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
+              <span className="relative flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+              </span>
+              CRITICAL ALERT
+            </div>
+            <p className="text-sm text-red-200">Our system independently detected this crash 48 hours in advance, calculating a 1-in-5,000 crash risk.</p>
+          </div>
+        </div>
+      ),
+      globeMode: 'collision_2009'
+    },
+    {
+      id: 3,
+      title: "4. The Escape Plan",
+      subtitle: "Automatic Avoidance",
+      icon: Shield,
+      content: (
+        <AvoidanceControls 
+          simLeadTime={simLeadTime} 
+          setSimLeadTime={setSimLeadTime} 
+          simDeltaV={simDeltaV} 
+          setSimDeltaV={setSimDeltaV} 
+        />
+      ),
+      globeMode: 'avoidance_2009'
+    }
+  ];
 
   // Fetch some real live objects to pass to Globe3D
   useEffect(() => {
+    let progressInterval = setInterval(() => {
+      setLoadProgress(p => p < 90 ? p + 10 : p);
+    }, 100);
+
     fetch('/api/objects?limit=25')
       .then(r => r.json())
       .then(d => {
+        clearInterval(progressInterval);
         if (d && d.objects) setLiveObjects(d.objects);
+        setLoadProgress(100);
       })
       .catch(e => {
+        clearInterval(progressInterval);
         console.warn("API offline (likely static Vercel host) - using fallback live data.");
+        setIsUsingFallbackData(true);
         // Generate some realistic looking fake satellite data for static deployments
         const fallbackObjects = Array.from({ length: 25 }).map((_, i) => {
           const r = 6378 + 400 + Math.random() * 800; // 400-1200km altitude
@@ -174,7 +190,10 @@ export default function App() {
           };
         });
         setLiveObjects(fallbackObjects);
+        setLoadProgress(100);
       });
+      
+    return () => clearInterval(progressInterval);
   }, []);
 
   const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, STORY_STEPS.length - 1));
@@ -191,9 +210,18 @@ export default function App() {
           <div className="bg-blue-600/20 p-2 rounded-lg text-blue-400">
             <Satellite className="w-5 h-5" />
           </div>
-          <div>
-            <h1 className="font-bold tracking-tight">Space-Guard</h1>
-            <p className="text-xs text-gray-400">Interactive Walkthrough Prototype</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="font-bold tracking-tight flex items-center gap-3">
+                Space-Guard
+                {isUsingFallbackData && (
+                  <span className="bg-amber-500/20 text-amber-400 border border-amber-500/50 px-2 py-0.5 rounded text-[10px] uppercase font-mono tracking-wider animate-pulse">
+                    Fallback API Data
+                  </span>
+                )}
+              </h1>
+              <p className="text-xs text-gray-400">Interactive Walkthrough Prototype</p>
+            </div>
           </div>
         </div>
         <div className="flex gap-2">
@@ -265,6 +293,8 @@ export default function App() {
               initialMode={stepData.globeMode || 'live'} 
               objects={liveObjects} 
               onLoadProgress={setLoadProgress}
+              simLeadTime={simLeadTime}
+              simDeltaV={simDeltaV}
             />
           </div>
 
