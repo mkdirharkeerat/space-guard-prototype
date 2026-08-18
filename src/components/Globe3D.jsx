@@ -5,7 +5,10 @@ import { sound } from '../utils/audio';
 import { formatDistance, formatScientific, getTierData } from '../utils/constants';
 
 // Helper: Circular radial glow sprite texture
+const _glowTextureCache = {};
 function createGlowSpriteTexture(colorHex = '#10B981') {
+  if (_glowTextureCache[colorHex]) return _glowTextureCache[colorHex];
+
   const canvas = document.createElement('canvas');
   canvas.width = 64;
   canvas.height = 64;
@@ -22,7 +25,27 @@ function createGlowSpriteTexture(colorHex = '#10B981') {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.needsUpdate = true;
+  _glowTextureCache[colorHex] = texture;
   return texture;
+}
+
+// --- GLOBAL CACHE FOR HIGH PERFORMANCE ---
+const _sharedBodyGeom = new THREE.BoxGeometry(0.2, 0.2, 0.26);
+const _sharedWingGeom = new THREE.BoxGeometry(0.5, 0.02, 0.18);
+const _sharedDishGeom = new THREE.ConeGeometry(0.09, 0.12, 16);
+const _sharedDishMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.1 });
+const _matCache = {};
+
+function getSharedMaterial(colorHex, type) {
+  const key = `${colorHex}-${type}`;
+  if (!_matCache[key]) {
+    _matCache[key] = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      metalness: type === 'body' ? 0.8 : 0.6,
+      roughness: type === 'body' ? 0.2 : 0.3,
+    });
+  }
+  return _matCache[key];
 }
 
 // Helper: Physical 3D Satellite Mesh (Bus + Solar Arrays)
@@ -30,35 +53,23 @@ function createSatelliteModel(bodyColorHex = 0xffd700, wingColorHex = 0x0284c7) 
   const group = new THREE.Group();
 
   // Central Satellite Body
-  const bodyGeom = new THREE.BoxGeometry(0.2, 0.2, 0.26);
-  const bodyMat = new THREE.MeshStandardMaterial({
-    color: bodyColorHex,
-    metalness: 0.8,
-    roughness: 0.2,
-  });
-  const body = new THREE.Mesh(bodyGeom, bodyMat);
+  const bodyMat = getSharedMaterial(bodyColorHex, 'body');
+  const body = new THREE.Mesh(_sharedBodyGeom, bodyMat);
   group.add(body);
 
   // Solar Wings
-  const wingGeom = new THREE.BoxGeometry(0.5, 0.02, 0.18);
-  const wingMat = new THREE.MeshStandardMaterial({
-    color: wingColorHex,
-    metalness: 0.6,
-    roughness: 0.3,
-  });
+  const wingMat = getSharedMaterial(wingColorHex, 'wing');
 
-  const leftWing = new THREE.Mesh(wingGeom, wingMat);
+  const leftWing = new THREE.Mesh(_sharedWingGeom, wingMat);
   leftWing.position.set(-0.38, 0, 0);
   group.add(leftWing);
 
-  const rightWing = new THREE.Mesh(wingGeom, wingMat);
+  const rightWing = new THREE.Mesh(_sharedWingGeom, wingMat);
   rightWing.position.set(0.38, 0, 0);
   group.add(rightWing);
 
   // Antenna Dish
-  const dishGeom = new THREE.ConeGeometry(0.09, 0.12, 16);
-  const dishMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.9, roughness: 0.1 });
-  const dish = new THREE.Mesh(dishGeom, dishMat);
+  const dish = new THREE.Mesh(_sharedDishGeom, _sharedDishMat);
   dish.rotation.x = Math.PI;
   dish.position.set(0, 0.16, 0);
   group.add(dish);
@@ -539,21 +550,28 @@ export default function Globe3D({
     const scaleFactor = 1 / 1000;
 
     const createOrbitRing = (radiusKm, incDeg, raanDeg, colorHex, isDashed = false) => {
-      const points = [];
-      const segments = 128;
       const r = (radiusKm || 7100) * scaleFactor;
-      for (let i = 0; i <= segments; i++) {
-        const theta = (i / segments) * Math.PI * 2;
-        points.push(new THREE.Vector3(r * Math.cos(theta), 0, r * Math.sin(theta)));
+      
+      // Use shared base geometry of radius 1 and scale the mesh
+      if (!window._sharedOrbitGeom) {
+        const points = [];
+        const segments = 128;
+        for (let i = 0; i <= segments; i++) {
+          const theta = (i / segments) * Math.PI * 2;
+          points.push(new THREE.Vector3(Math.cos(theta), 0, Math.sin(theta)));
+        }
+        window._sharedOrbitGeom = new THREE.BufferGeometry().setFromPoints(points);
       }
-      const geom = new THREE.BufferGeometry().setFromPoints(points);
+      
       const mat = new THREE.LineBasicMaterial({
         color: colorHex,
         transparent: true,
         opacity: isDashed ? 0.4 : 0.85,
         linewidth: 2,
       });
-      const line = new THREE.Line(geom, mat);
+      
+      const line = new THREE.Line(window._sharedOrbitGeom, mat);
+      line.scale.set(r, r, r);
       line.rotation.z = (incDeg || 0) * (Math.PI / 180);
       line.rotation.y = (raanDeg || 0) * (Math.PI / 180);
       return line;
@@ -635,13 +653,16 @@ export default function Globe3D({
             satGroup.add(satModel);
             
             // Add a glowing corona to the satellite
-            const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
-              map: createGlowSpriteTexture('#0ea5e9'),
-              color: 0x0ea5e9,
-              transparent: true,
-              opacity: 0.8,
-              blending: THREE.AdditiveBlending
-            }));
+            if (!window._sharedGlowMat) {
+              window._sharedGlowMat = new THREE.SpriteMaterial({
+                map: createGlowSpriteTexture('#0ea5e9'),
+                color: 0x0ea5e9,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+              });
+            }
+            const glowSprite = new THREE.Sprite(window._sharedGlowMat);
             glowSprite.scale.set(1.5, 1.5, 1.5);
             satGroup.add(glowSprite);
 
