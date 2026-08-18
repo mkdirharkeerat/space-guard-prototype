@@ -145,6 +145,7 @@ function AvoidanceControls() {
 export default function App() {
   const [currentStep, setCurrentStep] = useState(0);
   const [liveObjects, setLiveObjects] = useState([]);
+  const [loadProgress, setLoadProgress] = useState(0);
 
   // Fetch some real live objects to pass to Globe3D
   useEffect(() => {
@@ -198,40 +199,37 @@ export default function App() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
                 transition={{ duration: 0.3 }}
-                className="flex-1"
+                className="flex flex-col gap-6"
               >
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-white/5 border border-white/10 mb-6 text-gray-300">
-                  <StepIcon className="w-6 h-6" />
+                <div className="inline-flex items-center gap-2 bg-blue-500/10 text-blue-400 px-3 py-1.5 rounded-full w-fit text-sm font-medium border border-blue-500/20">
+                  <StepIcon className="w-4 h-4" />
+                  Step {currentStep + 1}: {stepData.title}
                 </div>
-                <h2 className="text-3xl font-bold mb-2 tracking-tight">{stepData.title}</h2>
-                <h3 className="text-blue-400 font-medium mb-6 uppercase tracking-wider text-sm">{stepData.subtitle}</h3>
                 
-                <div className="prose prose-invert prose-blue">
+                <h2 className="text-3xl font-bold leading-tight">{stepData.title}</h2>
+                <div className="text-gray-300 text-base leading-relaxed space-y-4">
                   {stepData.content}
                 </div>
               </motion.div>
             </AnimatePresence>
           </div>
           
-          {/* Controls */}
-          <div className="p-6 border-t border-white/10 bg-black/20 flex justify-between items-center">
+          {/* Navigation Controls */}
+          <div className="p-6 border-t border-white/10 bg-black/40 backdrop-blur-md flex items-center justify-between mt-auto">
             <button
               onClick={prevStep}
               disabled={currentStep === 0}
-              className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${currentStep === 0 ? 'opacity-30 cursor-not-allowed text-gray-500' : 'text-gray-300 hover:bg-white/10'}`}
+              className="px-4 py-2 rounded-lg font-medium text-sm text-gray-400 hover:text-white hover:bg-white/5 disabled:opacity-30 disabled:pointer-events-none transition-colors"
             >
               Previous
             </button>
             <button
               onClick={nextStep}
               disabled={currentStep === STORY_STEPS.length - 1}
-              className={`flex items-center gap-2 px-6 py-2 rounded-lg font-medium text-sm transition-all shadow-lg ${
-                currentStep === STORY_STEPS.length - 1 
-                  ? 'opacity-30 cursor-not-allowed bg-blue-600/50 text-white/50' 
-                  : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-500/20'
-              }`}
+              className="px-6 py-2.5 rounded-lg font-semibold text-sm bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-2 group"
             >
-              Next Step <ArrowRight className="w-4 h-4" />
+              Next Step
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
         </div>
@@ -246,15 +244,30 @@ export default function App() {
             <Globe3D 
               initialMode={stepData.globeMode || 'live'} 
               objects={liveObjects} 
+              onLoadProgress={setLoadProgress}
             />
           </div>
 
           {/* Loading Spinner Overlay for Step 0 */}
           {!stepData.globeMode && (
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center z-10 bg-black/80 backdrop-blur-sm">
-              <div className="w-24 h-24 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-8" />
+              <div className="w-24 h-24 flex items-center justify-center mb-8 relative">
+                <div className="absolute inset-0 border-4 border-blue-500/20 rounded-full" />
+                <div 
+                  className="absolute inset-0 border-4 border-blue-500 rounded-full transition-all duration-300"
+                  style={{ clipPath: `polygon(0 0, 100% 0, 100% ${loadProgress}%, 0 ${loadProgress}%)` }} 
+                />
+                <span className="text-xl font-bold font-mono text-blue-400">{loadProgress}%</span>
+              </div>
               <h3 className="text-2xl font-bold mb-2">Establishing Uplink</h3>
-              <p className="text-gray-400 max-w-md">Connecting to CelesTrak public database to stream real-time orbital elements...</p>
+              <p className="text-gray-400 max-w-md">Connecting to CelesTrak public database and compiling Space-Guard 3D rendering engine...</p>
+              
+              <div className="w-64 h-1 bg-white/10 rounded-full overflow-hidden mt-6">
+                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${loadProgress}%` }} />
+              </div>
+              {loadProgress === 100 && (
+                <p className="text-emerald-400 mt-4 font-mono text-sm tracking-widest animate-pulse">SYSTEM READY - PROCEED TO STEP 1</p>
+              )}
             </div>
           )}
         </div>

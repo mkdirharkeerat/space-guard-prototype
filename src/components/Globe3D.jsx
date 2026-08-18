@@ -82,7 +82,8 @@ export default function Globe3D({
   activeEvents = [], 
   objects = [], 
   initialMode = 'live',
-  onModeChange 
+  onModeChange,
+  onLoadProgress
 }) {
   const containerRef = useRef(null);
   const rendererRef = useRef(null);
@@ -141,6 +142,13 @@ export default function Globe3D({
   // Main Three.js Setup
   useEffect(() => {
     if (!containerRef.current) return;
+    
+    // Wire up global loading manager for progress bar
+    THREE.DefaultLoadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+      if (onLoadProgress) {
+        onLoadProgress(Math.round((itemsLoaded / itemsTotal) * 100));
+      }
+    };
 
     const getContainerSize = () => {
       const el = containerRef.current;
