@@ -414,9 +414,21 @@ export default function Globe3D({
               const r = sat.userData.orbitRadius;
               
               if (currentMode === 'avoidance_2009') {
-                // Post-burn offset expanding
-                const offsetR = r + (p > 0.2 ? 0.00483 * 80 : 0); // exaggerated slightly for 3D visibility
-                sat.position.set(offsetR * Math.cos(currentAngle), (p > 0.2 ? 0.4 : 0), offsetR * Math.sin(currentAngle));
+                let thrustActive = false;
+                let offsetShift = 0;
+                
+                if (p > 0.2) {
+                  if (p < 0.25) thrustActive = true; // Burn duration
+                  const shiftProgress = Math.min(1, (p - 0.2) / 0.3);
+                  const ease = 1 - Math.pow(1 - shiftProgress, 3);
+                  offsetShift = ease * 0.00483 * 80;
+                }
+                
+                const offsetR = r + offsetShift;
+                sat.position.set(offsetR * Math.cos(currentAngle), (offsetShift > 0 ? 0.4 : 0), offsetR * Math.sin(currentAngle));
+                
+                const flame = sat.getObjectByName("thrustFlame");
+                if (flame) flame.visible = thrustActive;
               } else {
                 // Collision mode
                 if (p < tcaFraction) {
@@ -659,20 +671,6 @@ export default function Globe3D({
             const satModel = createSatelliteModel(0xffffff, 0x0ea5e9);
             satModel.scale.set(0.4, 0.4, 0.4);
             satGroup.add(satModel);
-            
-            // Add a glowing corona to the satellite
-            if (!window._sharedGlowMat) {
-              window._sharedGlowMat = new THREE.SpriteMaterial({
-                map: createGlowSpriteTexture('#0ea5e9'),
-                color: 0x0ea5e9,
-                transparent: true,
-                opacity: 0.8,
-                blending: THREE.AdditiveBlending
-              });
-            }
-            const glowSprite = new THREE.Sprite(window._sharedGlowMat);
-            glowSprite.scale.set(1.5, 1.5, 1.5);
-            satGroup.add(glowSprite);
 
             pivotGroup.add(satGroup);
 
@@ -698,8 +696,7 @@ export default function Globe3D({
         const orbitCosmos = createOrbitRing(altKm, incCosmos, 45, 0xf59e0b);
         orbitsGroupRef.current.add(orbitIridium);
         orbitsGroupRef.current.add(orbitCosmos);
-      } else {
-        // Avoidance mode: Shows original collision track (dashed) + Green modified avoidance track
+      } else if (simMode === 'avoidance_2009') {
         const orbitOriginal = createOrbitRing(altKm, incIridium, 0, 0xef4444, true);
         const orbitAvoidance = createOrbitRing(altKm + 4.83, incIridium, 0, 0x10b981);
         const orbitCosmos = createOrbitRing(altKm, incCosmos, 45, 0xf59e0b);
@@ -712,6 +709,18 @@ export default function Globe3D({
       const iridiumSat = createSatelliteModel(0xffd700, 0x0284c7);
       iridiumSat.userData = { orbitRadius: altKm * scaleFactor, isTarget2009: true };
       iridiumSat.rotation.z = incIridium * (Math.PI / 180);
+      
+      // Thrust Flame (hidden by default)
+      const flameGeom = new THREE.ConeGeometry(0.08, 0.4, 8);
+      flameGeom.translate(0, -0.2, 0); // shift pivot
+      const flameMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+      const flameMesh = new THREE.Mesh(flameGeom, flameMat);
+      flameMesh.rotation.x = -Math.PI / 2; // point it backwards
+      flameMesh.position.z = -0.13; // back of bus
+      flameMesh.name = "thrustFlame";
+      flameMesh.visible = false;
+      iridiumSat.add(flameMesh);
+
       satellitesGroupRef.current.add(iridiumSat);
 
       const cosmosSat = createSatelliteModel(0x94a3b8, 0x334155);
