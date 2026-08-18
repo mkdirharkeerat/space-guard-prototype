@@ -417,9 +417,9 @@ export default function Globe3D({
                 let thrustActive = false;
                 let offsetShift = 0;
                 
-                if (p > 0.2) {
-                  if (p < 0.25) thrustActive = true; // Burn duration
-                  const shiftProgress = Math.min(1, (p - 0.2) / 0.3);
+                if (p > 0.15) {
+                  if (p < 0.45) thrustActive = true; // Make burn duration longer so it's clearly visible
+                  const shiftProgress = Math.min(1, (p - 0.15) / 0.4);
                   const ease = 1 - Math.pow(1 - shiftProgress, 3);
                   offsetShift = ease * 0.00483 * 80;
                 }
@@ -654,8 +654,8 @@ export default function Globe3D({
             const initialAngle = raan;
 
             // Orbit Ring (Trail)
-            const orbit = createOrbitRing(dist, inclination * (180/Math.PI), raan * (180/Math.PI), 0x06b6d4);
-            orbit.material.opacity = 0.15;
+            const orbit = createOrbitRing(dist, inclination * (180/Math.PI), raan * (180/Math.PI), 0x0ea5e9);
+            orbit.material.opacity = 0.5;
             orbitsGroupRef.current.add(orbit);
 
             // Orbit Pivot (rotates the satellite around Earth)
@@ -711,12 +711,12 @@ export default function Globe3D({
       iridiumSat.rotation.z = incIridium * (Math.PI / 180);
       
       // Thrust Flame (hidden by default)
-      const flameGeom = new THREE.ConeGeometry(0.08, 0.4, 8);
-      flameGeom.translate(0, -0.2, 0); // shift pivot
-      const flameMat = new THREE.MeshBasicMaterial({ color: 0x3b82f6, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+      const flameGeom = new THREE.ConeGeometry(0.18, 1.2, 16);
+      flameGeom.translate(0, -0.6, 0); // shift pivot
+      const flameMat = new THREE.MeshBasicMaterial({ color: 0xff6600, transparent: true, opacity: 1.0, blending: THREE.AdditiveBlending });
       const flameMesh = new THREE.Mesh(flameGeom, flameMat);
       flameMesh.rotation.x = -Math.PI / 2; // point it backwards
-      flameMesh.position.z = -0.13; // back of bus
+      flameMesh.position.z = -0.15; // back of bus
       flameMesh.name = "thrustFlame";
       flameMesh.visible = false;
       iridiumSat.add(flameMesh);
