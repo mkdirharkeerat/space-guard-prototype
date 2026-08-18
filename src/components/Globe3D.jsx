@@ -566,6 +566,7 @@ export default function Globe3D({
         containerRef.current.removeChild(renderer.domElement);
       }
       renderer.dispose();
+      renderer.dispose();
     };
   }, []);
 
