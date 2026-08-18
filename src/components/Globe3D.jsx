@@ -232,7 +232,6 @@ export default function Globe3D({
       ctx.stroke();
     });
     // --- 🌍 Photorealistic Earth Textures ---
-    const textureLoader = new THREE.TextureLoader();
     
     // Use reliable high-res textures from unpkg
     const earthDiffuse = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
