@@ -237,54 +237,63 @@ export default function Globe3D({
       ctx.fill();
       ctx.stroke();
     });
-
-    for (let i = 0; i < 400; i++) {
-      const x = Math.random() * canvas.width;
-      const y = Math.random() * canvas.height;
-      if (
-        (x > 350 && x < 700 && y > 150 && y < 450) ||
-        (x > 1050 && x < 1800 && y > 150 && y < 500) ||
-        (x > 980 && x < 1350 && y > 400 && y < 820)
-      ) {
-        ctx.beginPath();
-        ctx.arc(x + (Math.random() - 0.5) * 40, y + (Math.random() - 0.5) * 40, Math.random() * 4 + 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    const earthTexture = new THREE.CanvasTexture(canvas);
-    earthTexture.needsUpdate = true;
-
-    // Solid Earth Sphere
+    // --- 🌍 Photorealistic Earth Textures ---
+    const textureLoader = new THREE.TextureLoader();
+    
+    // Use reliable high-res textures from unpkg
+    const earthDiffuse = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
+    const earthBump = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png');
+    const earthSpecular = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-water.png');
+    
+    // Create the Earth Mesh
     const earthGeom = new THREE.SphereGeometry(earthRadius, 64, 64);
-    const earthMat = new THREE.MeshStandardMaterial({
-      map: earthTexture,
-      roughness: 0.5,
-      metalness: 0.1,
-      emissive: new THREE.Color(0x040e1f),
-      emissiveIntensity: 0.35,
+    const earthMat = new THREE.MeshPhongMaterial({
+      map: earthDiffuse,
+      bumpMap: earthBump,
+      bumpScale: 0.1,
+      specularMap: earthSpecular,
+      specular: new THREE.Color('grey'),
+      shininess: 35,
     });
     const earthMesh = new THREE.Mesh(earthGeom, earthMat);
     earthParent.add(earthMesh);
 
-    // Lat/Long Wireframe Overlay
+    // --- ☁️ Cloud Layer ---
+    const cloudTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-clouds.png');
+    const cloudGeom = new THREE.SphereGeometry(earthRadius * 1.008, 64, 64);
+    const cloudMat = new THREE.MeshPhongMaterial({
+      map: cloudTexture,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
+    // Slowly rotate clouds over time
+    cloudMesh.userData.isCloud = true;
+    earthParent.add(cloudMesh);
+
+    // Lat/Long Wireframe Overlay (keep it but make it very subtle)
     const wireGeom = new THREE.SphereGeometry(earthRadius * 1.003, 36, 24);
     const wireMat = new THREE.MeshBasicMaterial({
-      color: 0x06b6d4,
+      color: 0x0ea5e9,
       wireframe: true,
       transparent: true,
-      opacity: 0.12,
+      opacity: 0.05,
+      blending: THREE.AdditiveBlending,
     });
     const wireMesh = new THREE.Mesh(wireGeom, wireMat);
     earthParent.add(wireMesh);
 
-    // Atmospheric Glow Shell
-    const atmosGeom = new THREE.SphereGeometry(earthRadius * 1.035, 32, 32);
+    // Atmospheric Glow Shell (blue instead of green for realism)
+    const atmosGeom = new THREE.SphereGeometry(earthRadius * 1.025, 32, 32);
     const atmosMat = new THREE.MeshBasicMaterial({
-      color: 0x00ff88,
+      color: 0x3b82f6,
       transparent: true,
-      opacity: 0.08,
+      opacity: 0.15,
       side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
     });
     const atmosMesh = new THREE.Mesh(atmosGeom, atmosMat);
     earthParent.add(atmosMesh);
